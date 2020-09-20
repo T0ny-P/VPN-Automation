@@ -1,5 +1,4 @@
 import re
-import numpy as np
 import pandas as pd
 import json
 
@@ -11,13 +10,15 @@ class ExcelJSON(object):
 	alphabet = 'abcdefghijklmnopqrstuvwxyz'
 	base26map = tuple(zip([i for i in alphabet], [i for i in base26]))
 
-	def __init__(self, location, coordinates=None, sheet=0, index=None, orient="row"):
+	def __init__(self, location, coordinates=None, sheet=0, index=None, orient="row", rmpadding=True):
 		self.location = location
 		self.sheet = sheet
 		self.index = ExcelJSON._parseCoordinates(self, index)[1]
 		self.orient = orient
+		self.rmpadding = rmpadding
 		self.colfilter = None
 		self.rowfilter = None
+
 
 		if coordinates:
 			self.coord = coordinates
@@ -81,6 +82,64 @@ class ExcelJSON(object):
 		# print("Row:", row)
 		return row, col
 
+	def _dfFormat(self, df):
+		"""docstring for parseCoordinates"""
+
+		df = df.where(pd.notnull(df), None)
+
+		# if you're using an index, drop the NaN index rows before you convert to a dictionary
+		if self.index is not None:
+			df.dropna(subset=[self.index], inplace=True)
+			mydict = df.set_index(self.index).to_dict(orient="split")
+			output = dict(zip(mydict["index"], [ x for x in mydict["data"]]))
+			print("temp dict created: ",output)
+			# Trims None values from end of each list. If the list is then empty, delete the dict entry.
+			if self.rmpadding == True:
+				outputupdate = dict(output)
+				for key, value in output.items():
+					if len(value) == 1 and type(value[0]) == type(None):
+						del(outputupdate[key])
+						continue
+					elif len(value) == 1:
+						outputupdate[key] = value[0]
+						continue
+
+					for ele in reversed(value):
+						if ele == None and len(value) >= 1:
+							del value[-1]
+						elif len(value) == 1:
+							outputupdate[key] = value[0]
+							break
+						else:
+							outputupdate[key] = value
+							break
+				output = outputupdate
+
+
+		# If no index is chosen a list of lists is returned
+		else:
+			mydict = df.to_dict(orient="split")
+			output = [ x for x in mydict["data"]]
+			print("temp list created: ", output)
+			# Trims None values from end of each list. If the list is then empty, drop the list. If a single value remains, drop the value for the list.
+			if self.rmpadding == True:
+				outputupdate = list(output)
+				for  entry in output:
+					if len(entry) == 1 and type(entry[0]) == type(None):
+						del(entry)
+						continue
+					elif len(entry) == 1:
+						entry = entry[0]
+						continue
+
+					for ele in reversed(entry):
+						if ele == None and len(entry) >= 1:
+							del entry[-1]
+						else:
+							break
+
+		return(output)
+
 	def irows(self, myrows):
 		rowlist = myrows.split(",")
 		rowfinal = []
@@ -101,7 +160,6 @@ class ExcelJSON(object):
 				colfinal.append(ExcelJSON._parseCoordinates(self, col)[1])
 		self.colfilter = colfinal 
 
-
 	def createJSON(self):
 		"""docstring for createJSON """
 		excel_file = pd.ExcelFile(self.location)
@@ -112,42 +170,31 @@ class ExcelJSON(object):
 			self.rowEnd += 1
 			self.colEnd += 1
 
-		print(data.head(50))
+		#print(data.head(50))
 		mydata = data.iloc[self.rowStart:self.rowEnd, self.colStart:self.colEnd]
 
 		if self.rowfilter is not None:
 				mydata = mydata.iloc[self.rowfilter,]
 
 		if self.colfilter is not None:
-				print(mydata)
 				mydata = mydata.iloc[:,self.colfilter]
 
 		print(mydata)
-		mydata = mydata.dropna(how = "all")
-		if self.index is not None:
-			mydict = mydata.set_index(self.index).to_dict(orient="split")
-			myjson = mydata.set_index(self.index).to_json(orient="split")
-			tempdict = dict(zip(mydict["index"], [ x[0] if len(x) == 1 else x for x in mydict["data"]]))
-			finaldata = {"xldata":tempdict} 
-			print(finaldata)
-			#print(myjson)
-			#print(mydict)
-			return(finaldata)
-		else:
-			mydict = mydata.to_dict(orient="split")
-			myjson = mydata.to_json(orient="split")
-			templist = [ x[0] if len(x) == 1 else x for x in mydict["data"]]
-			finaldata = {"xldata":templist} 
-			print(finaldata)
-			#print(myjson)
-			#print(mydict)
-			return(finaldata)
+
+		dfdict = ExcelJSON._dfFormat(self, mydata)
+		formateddict = {"xldata":dfdict}
+		finaldata = json.dumps(formateddict, indent=4)
+		print("\nfinal data:\n", finaldata)
+
+
+
 
 
 ###Some sample output to play around with
 if __name__ == "__main__":
 	print("example1:\n-----------------------------\n")
-	example1 = ExcelJSON("test.xlsx")
+	example1 = ExcelJSON("test.xlsx", sheet=1)
+	print(dir(example1))
 	example1.createJSON()
 
 	# TEST DATAFRAM:
@@ -188,7 +235,7 @@ if __name__ == "__main__":
 	#
 
 	print("\n\nexample2:\n-----------------------------\n")
-	example2 = ExcelJSON("C:\\Users\\aprayor\\Desktop\\test.xlsx", "A1:B25",  index="A")
+	example2 = ExcelJSON("test.xlsx", "A1:B25",  index="A", sheet=1)
 	example2.createJSON()
 
 	# FILTERED DATAFRAM (By range)
@@ -224,7 +271,7 @@ if __name__ == "__main__":
 
 
 	print("\n\nexample3:\n-----------------------------\n")
-	example3 = ExcelJSON("test.xlsx", index="F")
+	example3 = ExcelJSON("test.xlsx", index="F", sheet=1)
 	example3.irows("1,2,3,4,5,15,16,17,18,19,20")
 	example3.icols("A,B,C,F")
 	example3.createJSON()
@@ -248,10 +295,10 @@ if __name__ == "__main__":
 
 
 	print("\n\nexample4:\n-----------------------------\n")
-	example4 = ExcelJSON("test.xlsx", "A1:J11", index="A")
+	example4 = ExcelJSON("test.xlsx", index="A")
 	#example4.icols("A,C")
 	output = example4.createJSON()
-	print(type(output["xldata"]["A3"][3]))
+	#print(type(output["xldata"]["A3"][3]))
 
 	#FILTERED DATAFRAM (Starting with an excel range, further filtering with include methods)
 	#      0    2
@@ -269,11 +316,11 @@ if __name__ == "__main__":
 	# JSON:
 	# {'xldata': {'A1': 'C1', 'A2': 'C2', 'A3': 'C3', 'A4': 'C4', 'A5': 'C5', 'A6': 'C6', 'A7': 'C7', 'A8': 'C8', 'A9': 'C9', 'A10': 'C10'}}
 
-	# print("\n\nRealworld Example\n______________________________\n")
-	# x = ExcelJSON(r"C:\Users\aprayor\Documents\Gen.IT\WestSafetyServices_VPN_V5.10.xlsm", "B2:D200", sheet="Data-Input Details", index="B")
-	# #x.irows("")
-	# x.icols("B,D")
-	# x.createJSON()
+	print("\n\nRealworld Example\n______________________________\n")
+	x = ExcelJSON(r"C:\Users\aprayor\Documents\Gen.IT\WestSafetyServices_VPN_V5.10.xlsm", "B2:D421", sheet="Data-Input Details", index="B")
+	#x.irows("")
+	x.icols("B,D")
+	x.createJSON()
 
 
 
