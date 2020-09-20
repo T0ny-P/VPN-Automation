@@ -193,8 +193,7 @@ class ExcelJSON(object):
 ###Some sample output to play around with
 if __name__ == "__main__":
 	print("example1:\n-----------------------------\n")
-	example1 = ExcelJSON("test.xlsx", sheet=1)
-	print(dir(example1))
+	example1 = ExcelJSON("test.xlsx", sheet="Uniform Data")
 	example1.createJSON()
 
 	# TEST DATAFRAM:
@@ -235,7 +234,7 @@ if __name__ == "__main__":
 	#
 
 	print("\n\nexample2:\n-----------------------------\n")
-	example2 = ExcelJSON("test.xlsx", "A1:B25",  index="A", sheet=1)
+	example2 = ExcelJSON("test.xlsx", "A1:B25",  index="A", sheet="Uniform Data")
 	example2.createJSON()
 
 	# FILTERED DATAFRAM (By range)
@@ -271,7 +270,7 @@ if __name__ == "__main__":
 
 
 	print("\n\nexample3:\n-----------------------------\n")
-	example3 = ExcelJSON("test.xlsx", index="F", sheet=1)
+	example3 = ExcelJSON("test.xlsx", index="F", sheet="Uniform Data")
 	example3.irows("1,2,3,4,5,15,16,17,18,19,20")
 	example3.icols("A,B,C,F")
 	example3.createJSON()
@@ -317,7 +316,7 @@ if __name__ == "__main__":
 	# {'xldata': {'A1': 'C1', 'A2': 'C2', 'A3': 'C3', 'A4': 'C4', 'A5': 'C5', 'A6': 'C6', 'A7': 'C7', 'A8': 'C8', 'A9': 'C9', 'A10': 'C10'}}
 
 	print("\n\nRealworld Example\n______________________________\n")
-	x = ExcelJSON(r"C:\Users\aprayor\Documents\Gen.IT\WestSafetyServices_VPN_V5.10.xlsm", "B2:D421", sheet="Data-Input Details", index="B")
+	x = ExcelJSON(r"test.xlsx", "B2:D421", sheet="Real Example 1", index="B")
 	#x.irows("")
 	x.icols("B,D")
 	x.createJSON()
